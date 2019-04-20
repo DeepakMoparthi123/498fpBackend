@@ -4,7 +4,8 @@ var express = require('express'),
     mongoose = require('mongoose'),
     secrets = require('./config/secrets'),
     user = require('./models/user'),
-    task = require('./models/task'),
+    apartment = require('./models/apartment'),
+    ObjectId = require('mongodb').ObjectID;
     bodyParser = require('body-parser');
 
 // Create our Express application
@@ -20,65 +21,94 @@ var port = process.env.PORT || 4000;
 // Connect to a MongoDB
 mongoose.connect(secrets.mongo_connection,  { useNewUrlParser: true });
 
-// var randomUser = new user({name: "Deepak"});
-
-
-
 // Use the body-parser package in our application
-
-
 var userRoute = router.route('/users');
-var taskRoute = router.route('/tasks');
-router.get('/tasks/:id', function (req, res) {
-    console.log(req.params.id);
-    var promise = new Promise((resolve, reject) => {
-        resolve(task.findOne({'_id': req.params.id})
-    );
-     });
-     promise.then(function (value) {
-         res.status(200).json({"message" : "OK", "data": value});
-    }).catch(
-        res.status(404).json({"message": "invalid task ID", "data": "task ID not found"})
-    );
-})
-router.put('/tasks/:id', function (req, res) {
-    var promise = new Promise((resolve, reject) => {
-        console.log(req.params.id);
-        if (task.find({"_id": req.params.id}) == null){
-            reject();
+var apartmentRoute = router.route('/apartments');
+
+// Removes apartment id from current and saved arrays of users
+async function handleApartmentDelete(id){
+    await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
+    await user.updateMany({
+    }, {$pull: {savedApartments: id.toString()}}, {multi: true});
+}
+
+// Finds all apartments inside user currentApartment array and properly deletes them
+async function handleUserDelete(id){
+    let k = await user.findOne({"_id": id});
+    await user.update({
+    }, {$pull: {savedApartments: {$in: k.currentApartments}}}, {multi: true});
+    k.currentApartments.forEach(async aptID => {
+         if (aptID != {}){
+            await handleApartmentDelete(aptID);
         }
-        resolve(task.findOneAndUpdate({"_id": req.params.id}, {name: req.body.name,
-            description: req.body.description,
-            deadline: req.body.deadline,
-            completed: req.body.completed,
-            assignedUser: req.body.assignedUser,
-            assignedUserName: req.body.assignedUserName,
-            dateCreated: Date.now()})
-        );
-     });
-     promise.then(function (value) {
-         res.status(200).json({"message" : "OK", "data": value});
-    }).catch(
-        res.status(404).json({"message": "Invalid task ID", "data": "task ID not found"})
-    );
-})
-router.delete('/tasks/:id', function (req, res) {
-    var promise = new Promise((resolve, reject) => {
-        if (task.find({"_id": req.params.id}) == null){
-            reject();
-        }
-        resolve(task.findOneAndDelete({"_id": req.params.id}));
-     })
-     promise.then(function (value) {
-        res.status(200).json({"message": "OK"})
-    
-    }).catch(
-        res.status(404).json({"message": "task ID not found", "data": "invalid ID"})
-    );
-})
+    });
+    await apartment.deleteMany({userID: id});
+}
 
 
-taskRoute.get(function(req, res){
+
+
+router.get('/apartments/:id', function (req, res) {
+    async function returnApt(id){
+        try {
+            // checks if apartment exists
+            let k = await apartment.findOne({'_id': id});
+            if (k == null){
+                throw Error;
+            }
+            // If apartment is found, return
+            res.status(200).json({"message" : "OK", "data": k});
+        }
+        catch {
+            res.status(404).json({"message": "Invalid Apartment ID", "data": "Apartment ID not found"});
+        }
+    }
+    returnApt(req.params.id);
+})
+
+router.put('/apartments/:id', function (req, res) {
+    async function putModel(req){
+        try {
+            // find and update given apartment (validation run through parameter)
+            await apartment.findOneAndUpdate({_id: req.params.id}, {
+                LatLong: req.body.LatLong,
+                Address: req.body.Address,
+                StartDate: req.body.StartDate,
+                EndDate: req.body.EndDate,
+                Bedrooms: req.body.Bedrooms,
+                Bathrooms: req.body.Bathrooms,
+                userID: req.body.UserID
+                }, { runValidators: true });
+            await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne({_id: req.params.id})});
+        }
+        catch {
+            res.status(404).json({"message" : "User could not be updated"});
+        }
+    }
+    putModel(req);
+})
+
+router.delete('/apartments/:id', function (req, res) {
+    async function deleteApt(id) {
+        try {
+            // If apartment isn't found
+            if (await apartment.find({_id: id}).count() == 0){
+                throw Error;
+            }
+            // If apartment is found, delete
+            await handleApartmentDelete(ObjectId(id));
+            await apartment.findOneAndDelete({"_id": id});
+            res.status(200).json({"message": "OK"});
+        }
+        catch {
+            res.status(404).json({"message": "ID not found", "data": "invalid Apartment ID"})
+        }
+    }
+    deleteApt(req.params.id);
+})
+
+apartmentRoute.get(function(req, res){
+    // Necessary to parse JSON
     function checkForNull(query){
         try {
             var output = JSON.parse(query);
@@ -88,11 +118,11 @@ taskRoute.get(function(req, res){
             return null;
         }
     }
-    function getNumber(query, defaultVal){
+    // Necessary to parse JSON
+    function getNumber(query){
         try {
-
-           if (query == undefined || query == null){
-               return defaultVal;
+           if (query == null){
+               return 0;
            }
            var output = parseInt(query);
            
@@ -105,100 +135,150 @@ taskRoute.get(function(req, res){
             return 0;
         }
     }
-    var promise = new Promise((resolve, reject) => {
-        if (checkForNull(req.query.count) == true){
-            console.log(req.query.limit);
-            resolve(task.find(checkForNull(req.query.where))
-              .limit(getNumber(req.query.limit, 30))
-              .select(checkForNull(req.query.select))
-              .skip(getNumber(req.query.skip, 0))
-              .sort(checkForNull(req.query.sort)).count()
-            );
-        }
-        else {
-            console.log(req.query.count);
-            resolve(task.find(checkForNull(req.query.where))
-                .limit(getNumber(req.query.limit, 30))
-                .select(checkForNull(req.query.select))
-                .skip(getNumber(req.query.skip, 0))
-                .sort(checkForNull(req.query.sort))
-            );
-        }
-    });
-    promise.then(function (value) {
-        res.status(200).json({"message" : "OK", "data": value});
-   });
+
+    async function queryMongo(req){
+        // Count parameter
+       if (req.query.count == 1){
+           var outApartment = await apartment.find(checkForNull(req.query.where)).count();
+       }
+       else {
+           var outApartment = await apartment.find(checkForNull(req.query.where))
+               .limit(getNumber(req.query.limit))
+               .select(checkForNull(req.query.select))
+               .skip(getNumber(req.query.skip))
+               .sort(checkForNull(req.query.sort));
+       }
+       res.status(200).json({"message" : "OK", "data": outApartment});
+    }
+    queryMongo(req);
 }).post(function(req, res){
-   console.log(req.body);
-   var promise = new Promise((resolve, reject) => {
-       console.log(req.body);
-       var newTask = new task({
-           name: req.body.name,
-           description: req.body.description,
-           deadline: req.body.deadline,
-           completed: req.body.completed,
-           assignedUser: req.body.assignedUser,
-           assignedUserName: req.body.assignedUserName,
-           dateCreated: Date.now()
-       })
-       newTask.save(function (err) {
-           console.log("error");
-       })
-       resolve(newTask);
-   });
-   promise.then(function (newTask) {
-       res.status(201).json({"message" : "Created", "data": newTask});
-  });
+    async function postToModel(req){
+        // Makes new apartment with specifications
+        var newApartment = new apartment({
+            LatLong: req.body.LatLong,
+            Address: req.body.Address,
+            StartDate: req.body.StartDate,
+            EndDate: req.body.EndDate,
+            Bedrooms: req.body.Bedrooms,
+            Bathrooms: req.body.Bathrooms,
+            userID: req.body.UserID
+        })
+        
+        try {
+            // If user ID specified in body is invalid, do not post
+            if (await user.find({_id: req.body.UserID}).count() == 0){
+                throw Error;
+            }
+            await user.updateOne({_id: newApartment.userID}, {$push: {currentApartments: newApartment._id}});
+            await newApartment.save();
+            res.status(201).json({"message" : "Apartment Created", "data": newApartment});
+        }
+        catch {
+            res.status(400).json({"message" : "Apartment Not Created, invalid parameters"});
+        }
+    }
+    postToModel(req);
 });
 
 
 router.get('/users/:id', function (req, res) {
-    console.log(req.params.id);
-    var promise = new Promise((resolve, reject) => {
-        resolve(user.findOne({'_id': req.params.id})
-    );
-     });
-     promise.then(function (value) {
-         res.status(200).json({"message" : "OK", "data": value});
-    }).catch(
-        res.status(404).json({"message": "Invalid User ID", "data": "User ID not found"})
-    );
+    async function returnUser(id){
+        try {
+            let k = await user.findOne({'_id': id});
+            // if user not found, throw error
+            if (k == null){
+                throw Error;
+            }
+            res.status(200).json({"message" : "OK", "data": k});
+        }
+        catch {
+            res.status(404).json({"message": "Invalid User ID", "data": "User ID not found"});
+        }
+    }
+    returnUser(req.params.id);
 })
 router.put('/users/:id', function (req, res) {
-    var promise = new Promise((resolve, reject) => {
-        console.log(req.params.id);
-        if (user.find({"_id": req.params.id}) == null){
-            reject();
-        }
-        resolve(user.findOneAndUpdate({"_id": req.params.id}, {
-            name: req.body.name,
+    async function putModel(req){
+        var newUser = new user({
+            _id: req.params.id,
+            currentApartments: req.body.currentApartments,
+            savedApartments: req.body.savedApartments,
+            cellPhone: req.body.cellPhone,
             email: req.body.email,
-            pendingTasks: req.body.pendingTasks,
-            dateCreated: Date.now()})
-        );
-     });
-     promise.then(function (value) {
-         res.status(200).json({"message" : "OK", "data": value});
-    }).catch(
-        res.status(404).json({"message": "User ID not found", "data": "invalid user ID"})
-    );
+            name: req.body.name
+        });
+        var currentUser = await user.findOne({"_id": newUser.id});
+        
+        // Necessary to filter out apartments with invalid ID's
+         async function filterApartments(apartments){
+             async function includeApartment(apartmentID){
+                // Filter out if apartment with given ID is not found
+                try {
+                    let k = await apartment.find({_id: ObjectId(apartmentID)}).count();
+                    return 1 == k;
+                } catch {
+                    return false;
+                }
+             }
+            apartments = await apartments.filter( async apartmentID => { 
+                    try {
+                        await includeApartment(apartmentID)}
+                    catch {
+                        return false;
+                    }
+                }
+            )
+            return apartments;
+        }
+        newUser.currentApartments = filterApartments(newUser.currentApartments);
+        newUser.savedApartments = filterApartments(newUser.savedApartments);
+        currentUser.currentApartments.forEach(async apartmentID => {
+                if (!newUser.currentApartments.includes(apartmentID)){
+                    try {
+                        await handleApartmentDelete(ObjectId(apartmentID));
+                        await apartment.deleteOne({_id: ObjectId(apartmentID)});
+                    }
+                    catch {
+
+                    }
+                }
+            }   
+        )
+        try {
+            await user.findOneAndUpdate({_id: req.params.id}, {
+                currentApartments: newUser.currentApartments,
+                savedApartments: newUser.savedApartments,
+                cellPhone: newUser.cellPhone,
+                email: newUser.email,
+                name: newUser.name
+            });
+            res.status(201).json({"message" : "Apartment Updated", "data": newUser});
+        }
+        catch {
+            res.status(404).json({"message" : "Apartment not found"});
+        }
+        
+    }
+    putModel(req);
 })
 router.delete('/users/:id', function (req, res) {
-    var promise = new Promise((resolve, reject) => {
-        if (user.find({"_id": req.params.id}) == null){
-            reject();
+    async function deleteUser(id) {
+        try {
+            if (await user.find({_id: id}).count() == 0){
+                throw Error;
+            }
+            await handleUserDelete(id);
+            await user.findOneAndDelete({"_id": id});
+            res.status(200).json({"message": "OK"});
         }
-        resolve(user.findOneAndDelete({"_id": req.params.id}));
-  
-       
-     })
-     promise.then(function (value) {
-            res.status(200).json({"message": "OK"})
-    }).catch(
+        catch {
             res.status(404).json({"message": "ID not found", "data": "invalid user ID"})
-    );
+        }
+    }
+    deleteUser(req.params.id);
 })
 userRoute.get(function(req, res){
+    // JSON processing
      function checkForNull(query){
          try {
              var output = JSON.parse(query);
@@ -208,6 +288,7 @@ userRoute.get(function(req, res){
              return null;
          }
      }
+     // JSON processing
      function getNumber(query){
          try {
             if (query == null){
@@ -224,54 +305,68 @@ userRoute.get(function(req, res){
              return 0;
          }
      }
-     var promise = new Promise((resolve, reject) => {
-        if (checkForNull(req.query.count) == true){
-            console.log(req.query.count);
-            resolve(user.find(checkForNull(req.query.where))
-              .limit(getNumber(req.query.limit))
-              .select(checkForNull(req.query.select))
-              .skip(getNumber(req.query.skip))
-              .sort(checkForNull(req.query.sort)).count()
-            );
+     async function queryMongo(req){
+         // Count parameter
+        if (req.query.count == 1){
+            var outUser = await user.find(checkForNull(req.query.where)).count();
         }
         else {
-            console.log(req.query.count);
-            resolve(user.find(checkForNull(req.query.where))
+            var outUser = await user.find(checkForNull(req.query.where))
                 .limit(getNumber(req.query.limit))
                 .select(checkForNull(req.query.select))
                 .skip(getNumber(req.query.skip))
-                .sort(checkForNull(req.query.sort))
-            );
+                .sort(checkForNull(req.query.sort));
         }
-     });
-     promise.then(function (value) {
-         res.status(200).json({"message" : "OK", "data": value});
-    });
+        res.status(200).json({"message" : "OK", "data": outUser});
+     }
+    queryMongo(req);
 }).post(function(req, res){
-    console.log(req.body);
-    var promise = new Promise((resolve, reject) => {
-        console.log(req.body);
+    async function postToModel(req){
         var newUser = new user({
-            name: req.body.name,
+            _id: req.body._id,
+            currentApartments: req.body.currentApartments,
+            savedApartments: req.body.savedApartments,
+            cellPhone: req.body.cellPhone,
             email: req.body.email,
-            pendingTasks: req.body.pendingTasks,
-            dateCreated: Date.now()
+            name: req.body.name
         })
-        newUser.save(function (err) {
-            console.log("error");
-        })
-        resolve(newUser);
-    });
-    promise.then(function (newUser) {
-        res.status(201).json({"message" : "User Created", "data": newUser});
-   });
+        // Necessary to filter out apartments in saved/current apartments with invalid ID's
+         async function filterApartments(apartments){
+             async function includeApartment(apartmentID){
+                 // Valid autogenerated ID must be 12 bytes long
+                try{
+                // Filter out if not found
+                let k = await apartment.find({_id: ObjectId(apartmentID)}).count();
+                    return 1 == k;
+                } catch {
+
+                }
+             }
+             apartments = await apartments.filter(async  apartmentID => { 
+                    try {
+                       await includeApartment(apartmentID)}
+                    catch {
+                        return false;
+                    }
+                }
+            )
+            return apartments;
+        }
+        newUser.currentApartments = filterApartments(newUser.currentApartments);
+        newUser.savedApartments = filterApartments(newUser.savedApartments);
+        try {
+            await newUser.save();
+            res.status(201).json({"message" : "User Created", "data": newUser});
+        }
+        catch {
+            res.status(404).json({"message" : "Invalid parameters"});
+        }
+        
+    }
+    postToModel(req);
 });
 
 
-// randomUser.save(function (err, randomUser) {
-//     if (err) return console.error(err);
-//     console.log("saving");
-// })
 // Allow CORS so that backend and frontend could be put on different servers
 var allowCrossDomain = function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -280,10 +375,6 @@ var allowCrossDomain = function (req, res, next) {
     next();
 };
 app.use(allowCrossDomain);
-
-
-
-
 
 // Use routes as a module (see index.js)
 require('./routes')(app, router);
