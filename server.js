@@ -69,8 +69,9 @@ router.get('/apartments/:id', function (req, res) {
 router.put('/apartments/:id', function (req, res) {
     async function putModel(req){
         try {
+            await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
             // find and update given apartment (validation run through parameter)
-            await apartment.findOneAndUpdate({_id: req.params.id}, {
+            let k =  apartment.findOneAndUpdate({_id: req.params.id}, {
                 LatLong: req.body.LatLong,
                 Address: req.body.Address,
                 StartDate: req.body.StartDate,
@@ -79,7 +80,8 @@ router.put('/apartments/:id', function (req, res) {
                 Bathrooms: req.body.Bathrooms,
                 userID: req.body.UserID
                 }, { runValidators: true });
-            await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne({_id: req.params.id})});
+            await user.updateOne({_id: k.userID}, {$push: {currentApartments: id}});
+            await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne(k)});
         }
         catch {
             res.status(404).json({"message" : "Apartment could not be updated"});
@@ -169,6 +171,7 @@ apartmentRoute.get(function(req, res){
             if (await user.find({_id: req.body.UserID}).count() == 0){
                 throw Error;
             }
+            // Updates all users by deleting the apartment id from their list of current apartments
             await user.updateOne({_id: newApartment.userID}, {$push: {currentApartments: newApartment._id}});
             await newApartment.save();
             res.status(201).json({"message" : "Apartment Created", "data": newApartment});
@@ -244,6 +247,16 @@ router.put('/users/:id', function (req, res) {
 
                 }
             }
+        }
+        for (let index = 0; index < newUser.currentApartments.length; index++){
+            let k = newUser.currentApartments[index];
+            if ((typeof k) == String) {
+                k = ObjectId(k);
+            }
+            let apt = await apartment.findOne({_id: k});
+            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: k}});
+            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: ObjectId(k)}});
+            await apartment.findOneAndUpdate({_id: k.toString()}, {userID: newUser._id});
         }
         
             await user.findOneAndUpdate({_id: req.params.id}, {
@@ -348,14 +361,26 @@ userRoute.get(function(req, res){
             for (let index = 0; index < apartments.length; index++){
                 if (await includeApartment(apartments[index])){
                     output.push(apartments[index]);
+                    
                 }
             }
+            
              return output;
         }
         
+        
         newUser.currentApartments = await filterApartments(newUser.currentApartments);
         newUser.savedApartments = await filterApartments(newUser.savedApartments);
-        
+        for (let index = 0; index < newUser.currentApartments.length; index++){
+            let k = newUser.currentApartments[index];
+            if ((typeof k) == String) {
+                k = ObjectId(k);
+            }
+            let apt = await apartment.findOne({_id: k});
+            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: k}});
+            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: ObjectId(k)}});
+            await apartment.findOneAndUpdate({_id: k.toString()}, {userID: newUser._id});
+        }
         try {
             await newUser.save();
             await res.status(201).json({"message" : "User Created", "data": newUser});
