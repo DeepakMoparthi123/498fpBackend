@@ -3,6 +3,7 @@ var apartment = require('../models/apartment.js');
 var user = require('../models/user.js');
 var helper = require('../helper.js');
 var ObjectId = require('mongodb').ObjectID;
+var apt = require('./apartment.js');
 
 async function getUser(req, res, next) {
     try {
@@ -57,7 +58,7 @@ async function putModel(req, res, next){
             let k = currentUser.currentApartments[index].toString();
             if (!await newUser.currentApartments.includes(k)){
                 try {
-                    await handleApartmentDelete(ObjectId(k));
+                    await apt.handleApartmentDelete(ObjectId(k));
                     await apartment.deleteOne({_id: k});
                 }
                 catch{
@@ -98,7 +99,7 @@ async function deleteUser(req, res, next) {
             throw Error;
         }
         // Updates/deletes all data that would be affected by deleting user
-        await handleUserDelete(id);
+        await apt.handleUserDelete(id);
         // Delete user
         await user.findOneAndDelete({"_id": id});
         res.status(200).json({"message": "OK"});
