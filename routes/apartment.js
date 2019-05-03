@@ -54,7 +54,7 @@ async function updateApt(req, res, next){
             EndDate: req.body.EndDate,
             Bedrooms: req.body.Bedrooms,
             Bathrooms: req.body.Bathrooms,
-            userID: req.body.UserID
+            userID: req.body.userID
         }, { runValidators: true });
 
         await user.updateOne({_id: k.userID }, { $push: { currentApartments: id }});
@@ -131,7 +131,7 @@ async function createApt(req, res, next) {
 async function getCurrentApts(req, res, next) {
     let userId = req.body.userID
 
-    
+
 
 }
 // TODO: get all savedApts of this user
