@@ -19,10 +19,10 @@ async function getUser(req, res, next) {
     }
 }
 
-async function putModel(req, res, next){
+async function updateUser(req, res, next){
         try {
         var newUser = new user({
-            _id: req.params.id,
+            id: req.params.id,
             currentApartments: req.body.currentApartments,
             savedApartments: req.body.savedApartments,
             cellPhone: req.body.cellPhone,
@@ -44,8 +44,8 @@ async function putModel(req, res, next){
                 }
              }
              let output = [];
-             for (let index = 0; index < apartments.length; index++){
-                if (await includeApartment(apartments[index])){
+            for (let index = 0; index < apartments.length; index++) {
+                if (await includeApartment(apartments[index])) {
                     output.push(apartments[index]);
                 }
             }
@@ -109,7 +109,7 @@ async function deleteUser(req, res, next) {
     }
 }
 
-async function queryMongo(req, res, next){
+async function getUsers(req, res, next){
          // Count parameter
         if (req.query.count == 1){
             var outUser = await user.find(helper.checkForNull(req.query.where)).count();
@@ -124,11 +124,11 @@ async function queryMongo(req, res, next){
         res.status(200).json({"message" : "OK", "data": outUser});
      }
 
-async function postToModel(req, res, next){
+async function createUser(req, res, next){
         var newUser = await new user({
-            _id: req.body._id,
-            currentApartments: req.body.currentApartments,
-            savedApartments: req.body.savedApartments,
+            _id: req.body.userID,
+            currentApartments: [],
+            savedApartments: [],
             cellPhone: req.body.cellPhone,
             email: req.body.email,
             name: req.body.name
@@ -139,7 +139,7 @@ async function postToModel(req, res, next){
                 try {
                 // Filter out if not found
                 let k = await apartment.find({_id: ObjectId(""+apartmentID)}).count();
-                return (1 == k);
+                return (k == 1);
                 } catch {
                     return false;
                 }
@@ -172,16 +172,16 @@ async function postToModel(req, res, next){
             await newUser.save();
             await res.status(201).json({"message" : "User Created", "data": newUser});
         }
-        catch {
-            await res.status(404).json({"message" : "Invalid parameters"});
+        catch (err) {
+            await res.status(404).json({"message" : "Invalid parameters", data: err});
         }
         
     }
 
 module.exports = {
 	getUser: getUser,
-	putModel: putModel,
+	updateUser: updateUser,
 	deleteUser: deleteUser,
-	queryMongo: queryMongo,
-	postToModel: postToModel
+	getUsers: getUsers,
+	createUser: createUser
 };

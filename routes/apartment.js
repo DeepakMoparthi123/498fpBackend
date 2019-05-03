@@ -26,7 +26,7 @@ async function handleUserDelete(req, res, next){
     await apartment.deleteMany({userID: id});
 }
 
-async function returnApt(req, res, next){
+async function getApt(req, res, next){
     try {
     	let id = req.params.id
         // checks if apartment exists
@@ -42,21 +42,23 @@ async function returnApt(req, res, next){
     }
 }
 
-async function putModel(req, res, next){
-        try {
-            await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
-            // find and update given apartment (validation run through parameter)
-            let k =  apartment.findOneAndUpdate({_id: req.params.id}, {
-                LatLong: req.body.LatLong,
-                Address: req.body.Address,
-                StartDate: req.body.StartDate,
-                EndDate: req.body.EndDate,
-                Bedrooms: req.body.Bedrooms,
-                Bathrooms: req.body.Bathrooms,
-                userID: req.body.UserID
-                }, { runValidators: true });
-            await user.updateOne({_id: k.userID}, {$push: {currentApartments: id}});
-            await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne(k)});
+async function updateApt(req, res, next){
+    try {
+        let id = req.params.id
+        await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
+        // find and update given apartment (validation run through parameter)
+        let k =  apartment.findOneAndUpdate({_id: req.params.id}, {
+            LatLong: req.body.LatLong,
+            Address: req.body.Address,
+            StartDate: req.body.StartDate,
+            EndDate: req.body.EndDate,
+            Bedrooms: req.body.Bedrooms,
+            Bathrooms: req.body.Bathrooms,
+            userID: req.body.UserID
+        }, { runValidators: true });
+
+        await user.updateOne({_id: k.userID }, { $push: { currentApartments: id }});
+        await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne(k)});
         }
         catch {
             res.status(404).json({"message" : "Apartment could not be updated"});
@@ -80,7 +82,7 @@ async function deleteApt(req, res, next) {
     }
 }
 
-async function queryMongo(req, res, next){
+async function getApts(req, res, next){
         // Count parameter
        if (req.query.count == 1){
            var outApartment = await apartment.find(helper.checkForNull(req.query.where)).count();
@@ -95,39 +97,56 @@ async function queryMongo(req, res, next){
        res.status(200).json({"message" : "OK", "data": outApartment});
     }
 
-async function postToModel(req, res, next){
+async function createApt(req, res, next) {
         // Makes new apartment with specifications
-        var newApartment = new apartment({
-            LatLong: req.body.LatLong,
-            Address: req.body.Address,
-            StartDate: req.body.StartDate,
-            EndDate: req.body.EndDate,
-            Bedrooms: req.body.Bedrooms,
-            Bathrooms: req.body.Bathrooms,
-            userID: req.body.UserID
-        })
+    var newApartment = new apartment({
+        LatLong: req.body.LatLong,
+        Address: req.body.Address,
+        StartDate: req.body.StartDate,
+        EndDate: req.body.EndDate,
+        Bedrooms: req.body.Bedrooms,
+        Bathrooms: req.body.Bathrooms,
+        userID: req.body.UserID
+    })
         
-        try {
-            // If user ID specified in body is invalid, do not post
-            if (await user.find({_id: req.body.UserID}).count() == 0){
-                throw Error;
-            }
-            // Updates all users by deleting the apartment id from their list of current apartments
-            await user.updateOne({_id: newApartment.userID}, {$push: {currentApartments: newApartment._id}});
-            await newApartment.save();
-            res.status(201).json({"message" : "Apartment Created", "data": newApartment});
+    try {
+        // If user ID specified in body is invalid, do not post
+        if (await user.find({_id: req.body.UserID}).count() == 0){
+            throw Error;
         }
-        catch {
-            res.status(400).json({"message" : "Apartment Not Created, invalid parameters"});
-        }
+        // Updates all users by deleting the apartment id from their list of current apartments
+        await user.updateOne({_id: newApartment.userID}, {$push: {currentApartments: newApartment._id}});
+        await newApartment.save();
+        res.status(201).json({"message" : "Apartment Created", "data": newApartment});
     }
+    catch {
+        res.status(400).json({"message" : "Apartment Not Created, invalid parameters"});
+    }
+}
+
+// TODO: get list of apts based on lat-long distance from it
+// TODO: userId and apt to add to current apartments
+// TODO: userId and apt to add to saved apartments
+// TODO: get all currentApts of this user
+async function getCurrentApts(req, res, next) {
+    let userId = req.body.userID
+
+    
+
+}
+// TODO: get all savedApts of this user
+async function getSavedApts(req, res, next) {
+
+}
 
 module.exports = {
-	returnApt: returnApt,
+	getApt: getApt,
 	handleApartmentDelete: handleApartmentDelete,
 	handleUserDelete: handleUserDelete,
-	putModel: putModel,
+	updateApt: updateApt,
 	deleteApt: deleteApt,
-	queryMongo: queryMongo,
-	postToModel: postToModel
+	getApts: getApts,
+	createApt: createApt,
+    getCurrentApts: getCurrentApts,
+    getSavedApts: getSavedApts
 };
