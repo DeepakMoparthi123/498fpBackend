@@ -9,9 +9,10 @@ router.post('/apartments', apartment.createApt);
 router.get('/apartments/:id', apartment.getApt);
 router.put('/apartments/:id', apartment.updateApt);
 router.delete('/apartments/:id', apartment.deleteApt);
-// TODO: userId and apt to add to current apartments
 
-// TODO: userId and apt to add to saved apartments
+router.put('/apartments/:userid/current', apartment.addToCurrentApts);
+router.put('/apartments/:userid/saved', apartment.addToSavedApts);
+router.delete('/apartments/:userid/saved', apartment.removeFromSavedApts);
 
 router.get('/users', user.getUsers);
 router.post('/users', user.createUser);

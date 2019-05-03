@@ -125,8 +125,46 @@ async function createApt(req, res, next) {
 
 // TODO: get list of apts based on lat-long distance from it
 // TODO: userId and apt to add to current apartments
+async function addToCurrentApts(req, res, next) {
+    let userID = req.params.userid
+    let aptID = req.body.AptID
+
+    if (await user.find({ _id: userID }).countDocuments() == 0){
+        res.status(400).json({"message" : "Could not add apartment, user ID not found" });
+        return;
+    }
+    let result = await user.updateOne({ _id: userID}, { $push: { CurrentApartments: aptID }});
+    res.status(201).json({ "message": `Apartment ${aptID} added to User ${userID}\'s CurrentApartments`, data: result });
+    return;
+}
 
 // TODO: userId and apt to add to saved apartments
+async function addToSavedApts(req, res, next) {
+    let userID = req.params.userid
+    let aptID = req.body.AptID
+
+    if (await user.find({ _id: userID }).countDocuments() == 0){
+        res.status(400).json({"message" : "Could not add apartment, user ID not found" });
+        return;
+    }
+    let result = await user.updateOne({ _id: userID}, { $push: { SavedApartments: aptID }});
+    res.status(201).json({ "message": `Apartment ${aptID} added to User ${userID}\'s SavedApartments`, data: result });
+    return;
+}
+
+// remove apt from user's saved apartments
+async function removeFromSavedApts(req, res, next) {
+    let userID = req.params.userid
+    let aptID = req.body.AptID
+
+    if (await user.find({ _id: userID }).countDocuments() == 0){
+        res.status(400).json({"message" : "Could not remove apartment, user ID not found" });
+        return;
+    }
+    let result = await user.updateOne({ _id: userID}, { $pull: { SavedApartments: aptID }});
+    res.status(201).json({ "message": `Apartment ${aptID} removed from User ${userID}\'s SavedApartments`, data: result });
+    return;
+}
 
 
 module.exports = {
@@ -136,5 +174,8 @@ module.exports = {
 	updateApt: updateApt,
 	deleteApt: deleteApt,
 	getApts: getApts,
-	createApt: createApt
+	createApt: createApt,
+    addToCurrentApts: addToCurrentApts,
+    addToSavedApts: addToSavedApts,
+    removeFromSavedApts: removeFromSavedApts
 };

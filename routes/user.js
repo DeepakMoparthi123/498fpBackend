@@ -32,7 +32,6 @@ async function updateUser(req, res, next) {
         });
         // saves current user
         var currentUser = await user.findOne({"_id": newUser._id});
-        console.log(currentUser)
         
         // Necessary to filter out apartments with invalid ID's
          async function filterApartments(apartments){
