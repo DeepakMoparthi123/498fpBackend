@@ -5,80 +5,78 @@ var helper = require('../helper.js');
 var ObjectId = require('mongodb').ObjectID;
 
 // Removes apartment id from current and saved arrays of users
-async function handleApartmentDelete(req, res, next){
-	let id = req.params.id
-    await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
+async function handleApartmentDelete(id){
+    let apt = await apartment.findOne({_id: id})
+    let result = await user.updateOne({ "_id": apt.UserID }, { $pull: { CurrentApartments: id }});
     await user.updateMany({
-    }, {$pull: {savedApartments: id.toString()}}, {multi: true});
+    }, {$pull: { SavedApartments: id.toString()}}, {multi: true});
 }
 
 // Finds all apartments inside user currentApartment array and properly deletes them
-async function handleUserDelete(req, res, next){
-	let id = req.params.id
+async function handleUserDelete(id){
     let k = await user.findOne({"_id": id});
-    await user.update({
-    }, {$pull: {savedApartments: {$in: k.currentApartments}}}, {multi: true});
-    k.currentApartments.forEach(async aptID => {
+    await user.update({}, {$pull: { SavedApartments: {$in: k.CurrentApartments }}}, {multi: true});
+    k.CurrentApartments.forEach(async aptID => {
          if (aptID != {}){
             await handleApartmentDelete(aptID);
         }
     });
-    await apartment.deleteMany({userID: id});
+    await apartment.deleteMany({ UserID: id});
 }
 
 async function getApt(req, res, next){
     try {
     	let id = req.params.id
         // checks if apartment exists
-        let k = await apartment.findOne({'_id': id});
+        let k = await apartment.findOne({ "_id": id});
         if (k == null) {
             throw Error;
         }
         // If apartment is found, return
-        res.status(200).json({"message" : "OK", "data": k});
+        res.status(200).json({"message" : "Got apartment", "data": k});
     }
-    catch {
-        res.status(404).json({"message": "Invalid Apartment ID", "data": "Apartment ID not found"});
+    catch (err) {
+        res.status(404).json({ "message": "Apartment ID not found", "data": err });
     }
 }
 
 async function updateApt(req, res, next){
     try {
         let id = req.params.id
-        await user.updateOne({_id: (await apartment.findOne({_id: id})).userID}, {$pull: {currentApartments: id}});
+        await user.updateOne({ _id: (await apartment.findOne({_id: id})).UserID }, { $pull: { CurrentApartments: id }});
         // find and update given apartment (validation run through parameter)
-        let k =  apartment.findOneAndUpdate({_id: req.params.id}, {
+        let k =  apartment.findOneAndUpdate({ "_id": id }, {
             LatLong: req.body.LatLong,
             Address: req.body.Address,
             StartDate: req.body.StartDate,
             EndDate: req.body.EndDate,
             Bedrooms: req.body.Bedrooms,
             Bathrooms: req.body.Bathrooms,
-            userID: req.body.userID
+            UserID: req.body.UserID,
+            ImageURL: req.body.ImageURL
         }, { runValidators: true });
 
-        await user.updateOne({_id: k.userID }, { $push: { currentApartments: id }});
-        await res.status(201).json({"message" : "User Updated", "data": await apartment.findOne(k)});
-        }
-        catch {
-            res.status(404).json({"message" : "Apartment could not be updated"});
-        }
+        await user.updateOne({ _id: k.UserID }, { $push: { CurrentApartments: id }});
+        await res.status(201).json({ "message" : "Updated apartment", "data": await apartment.findOne(k)});
+    } catch (err) {
+        res.status(404).json({ "message" : "Could not update apartment", data: err });
     }
+}
 
 async function deleteApt(req, res, next) {
     try {
     	let id = req.params.id
         // If apartment isn't found
-        if (await apartment.find({_id: id}).count() == 0){
+        if (await apartment.find({ "_id": id}).count() == 0){
             throw Error;
         }
         // If apartment is found, delete
         await handleApartmentDelete(ObjectId(id));
-        await apartment.findOneAndDelete({"_id": id});
-        res.status(200).json({"message": "OK"});
+        await apartment.findOneAndDelete({ "_id": id });
+        res.status(200).json({"message": "Deleted apartment"});
     }
-    catch {
-        res.status(404).json({"message": "ID not found", "data": "invalid Apartment ID"})
+    catch (err) {
+        res.status(404).json({"message": "Apartment ID not found", "data": err })
     }
 }
 
@@ -94,7 +92,7 @@ async function getApts(req, res, next){
                .skip(helper.getNumber(req.query.skip))
                .sort(helper.checkForNull(req.query.sort));
        }
-       res.status(200).json({"message" : "OK", "data": outApartment});
+       res.status(200).json({"message" : "Got apartments", "data": outApartment});
     }
 
 async function createApt(req, res, next) {
@@ -106,38 +104,30 @@ async function createApt(req, res, next) {
         EndDate: req.body.EndDate,
         Bedrooms: req.body.Bedrooms,
         Bathrooms: req.body.Bathrooms,
-        userID: req.body.UserID
+        UserID: req.body.UserID,
+        ImageURL: req.body.ImageURL
     })
         
     try {
         // If user ID specified in body is invalid, do not post
-        if (await user.find({_id: req.body.UserID}).count() == 0){
+        if (await user.find({ _id: req.body.UserID }).count() == 0){
             throw Error;
         }
         // Updates all users by deleting the apartment id from their list of current apartments
-        await user.updateOne({_id: newApartment.userID}, {$push: {currentApartments: newApartment._id}});
+        await user.updateOne({ _id: newApartment.UserID}, { $push: { CurrentApartments: newApartment._id }});
         await newApartment.save();
-        res.status(201).json({"message" : "Apartment Created", "data": newApartment});
+        res.status(201).json({"message" : "Created new apartment", "data": newApartment});
     }
-    catch {
-        res.status(400).json({"message" : "Apartment Not Created, invalid parameters"});
+    catch (err) {
+        res.status(400).json({"message" : "Could not create apartment, invalid parameters", data: err});
     }
 }
 
 // TODO: get list of apts based on lat-long distance from it
 // TODO: userId and apt to add to current apartments
+
 // TODO: userId and apt to add to saved apartments
-// TODO: get all currentApts of this user
-async function getCurrentApts(req, res, next) {
-    let userId = req.body.userID
 
-
-
-}
-// TODO: get all savedApts of this user
-async function getSavedApts(req, res, next) {
-
-}
 
 module.exports = {
 	getApt: getApt,
@@ -146,7 +136,5 @@ module.exports = {
 	updateApt: updateApt,
 	deleteApt: deleteApt,
 	getApts: getApts,
-	createApt: createApt,
-    getCurrentApts: getCurrentApts,
-    getSavedApts: getSavedApts
+	createApt: createApt
 };

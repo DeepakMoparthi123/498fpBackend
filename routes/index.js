@@ -12,10 +12,6 @@ router.delete('/apartments/:id', apartment.deleteApt);
 // TODO: userId and apt to add to current apartments
 
 // TODO: userId and apt to add to saved apartments
-// TODO: get all currentApts of this user
-router.get('/apartments/current', apartment.getCurrentApts)
-// TODO: get all savedApts of this user
-router.get('/apartments/saved', apartment.getSavedApts)
 
 router.get('/users', user.getUsers);
 router.post('/users', user.createUser);

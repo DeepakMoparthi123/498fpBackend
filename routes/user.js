@@ -19,18 +19,20 @@ async function getUser(req, res, next) {
     }
 }
 
-async function updateUser(req, res, next){
-        try {
+async function updateUser(req, res, next) {
+    try {
         var newUser = new user({
-            id: req.params.id,
-            currentApartments: req.body.currentApartments,
-            savedApartments: req.body.savedApartments,
-            cellPhone: req.body.cellPhone,
-            email: req.body.email,
-            name: req.body.name
+            _id: req.params.id,
+            CurrentApartments: req.body.CurrentApartments,
+            SavedApartments: req.body.SavedApartments,
+            CellPhone: req.body.CellPhone,
+            Email: req.body.Email,
+            Name: req.body.Name,
+            ImageURL: req.body.ImageURL
         });
         // saves current user
-        var currentUser = await user.findOne({"_id": newUser.id});
+        var currentUser = await user.findOne({"_id": newUser._id});
+        console.log(currentUser)
         
         // Necessary to filter out apartments with invalid ID's
          async function filterApartments(apartments){
@@ -51,12 +53,12 @@ async function updateUser(req, res, next){
             }
             return output;
         }
-        newUser.currentApartments = await filterApartments(newUser.currentApartments);
-        newUser.savedApartments = await filterApartments(newUser.savedApartments);
+        newUser.CurrentApartments = await filterApartments(newUser.CurrentApartments);
+        newUser.SavedApartments = await filterApartments(newUser.SavedApartments);
         // Deletes apartments that used to be in old currentapartments list but are no longer in new list
-        for (let index = 0; index < currentUser.currentApartments.length; index++){
-            let k = currentUser.currentApartments[index].toString();
-            if (!await newUser.currentApartments.includes(k)){
+        for (let index = 0; index < currentUser.CurrentApartments.length; index++ ){
+            let k = currentUser.CurrentApartments[index].toString();
+            if (!await newUser.CurrentApartments.includes(k)){
                 try {
                     await apt.handleApartmentDelete(ObjectId(k));
                     await apartment.deleteOne({_id: k});
@@ -66,49 +68,51 @@ async function updateUser(req, res, next){
                 }
             }
         }
-        for (let index = 0; index < newUser.currentApartments.length; index++){
-            let k = newUser.currentApartments[index];
+        for (let index = 0; index < newUser.CurrentApartments.length; index++){
+            let k = newUser.CurrentApartments[index];
             if ((typeof k) == String) {
                 k = ObjectId(k);
             }
             let apt = await apartment.findOne({_id: k});
-            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: k}});
-            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: ObjectId(k)}});
-            await apartment.findOneAndUpdate({_id: k.toString()}, {userID: newUser._id});
+            await user.findOneAndUpdate({_id: apt.UserID}, {$pull: {CurrentApartments: k}});
+            await user.findOneAndUpdate({_id: apt.UserID}, {$pull: {CurrentApartments: ObjectId(k)}});
+            await apartment.findOneAndUpdate({_id: k.toString()}, { UserID: newUser._id});
         }
         
-            await user.findOneAndUpdate({_id: req.params.id}, {
-                currentApartments: newUser.currentApartments,
-                savedApartments: newUser.savedApartments,
-                cellPhone: newUser.cellPhone,
-                email: newUser.email,
-                name: newUser.name
+            await user.findOneAndUpdate({ _id: req.params.id }, {
+                CurrentApartments: newUser.CurrentApartments,
+                SavedApartments: newUser.SavedApartments,
+                CellPhone: newUser.CellPhone,
+                Email: newUser.Email,
+                Name: newUser.Name,
+                ImageURL: newUser.ImageURL
             });
-            res.status(201).json({"message" : "Apartment Updated", "data": newUser});
-        }
-        catch {
-            res.status(404).json({"message" : "Apartment not found"});
-        }
-        
+            
+            res.status(201).json({"message" : "User Updated", "data": newUser});
+    } catch (err) {
+        res.status(404).json({"message" : "User not found", data: err});
     }
+}
 
+// OK.
 async function deleteUser(req, res, next) {
     try {
     	let id = req.params.id
-        if (await user.find({_id: id}).count() == 0){
+        let userCount = await user.find({"_id": id}).countDocuments()
+        if (userCount === 0) {
             throw Error;
         }
         // Updates/deletes all data that would be affected by deleting user
         await apt.handleUserDelete(id);
         // Delete user
-        await user.findOneAndDelete({"_id": id});
-        res.status(200).json({"message": "OK"});
-    }
-    catch {
-        res.status(404).json({"message": "ID not found", "data": "invalid user ID"})
+        await user.findOneAndDelete({ "_id": id});
+        res.status(200).json({"message": "User deleted"});
+    } catch (err) {
+        res.status(404).json({ "message": "User not found", "data": err })
     }
 }
 
+// OK. 
 async function getUsers(req, res, next){
          // Count parameter
         if (req.query.count == 1){
@@ -126,19 +130,20 @@ async function getUsers(req, res, next){
 
 async function createUser(req, res, next){
         var newUser = await new user({
-            _id: req.body.userID,
-            currentApartments: [],
-            savedApartments: [],
-            cellPhone: req.body.cellPhone,
-            email: req.body.email,
-            name: req.body.name
+            _id: req.body.UserID,
+            CurrentApartments: [],
+            SavedApartments: [],
+            CellPhone: req.body.CellPhone,
+            Email: req.body.Email,
+            Name: req.body.Name,
+            ImageURL: req.body.ImageURL
         })
         // Necessary to filter out apartments in saved/current apartments with invalid ID's
          async function filterApartments(apartments){
              async function includeApartment(apartmentID){
                 try {
                 // Filter out if not found
-                let k = await apartment.find({_id: ObjectId(""+apartmentID)}).count();
+                let k = await apartment.find({_id: ObjectId("" + apartmentID)}).count();
                 return (k == 1);
                 } catch {
                     return false;
@@ -156,17 +161,17 @@ async function createUser(req, res, next){
         }
         
         
-        newUser.currentApartments = await filterApartments(newUser.currentApartments);
-        newUser.savedApartments = await filterApartments(newUser.savedApartments);
-        for (let index = 0; index < newUser.currentApartments.length; index++){
-            let k = newUser.currentApartments[index];
+        newUser.CurrentApartments = await filterApartments(newUser.CurrentApartments);
+        newUser.SavedApartments = await filterApartments(newUser.SavedApartments);
+        for (let index = 0; index < newUser.CurrentApartments.length; index++ ){
+            let k = newUser.CurrentApartments[index];
             if ((typeof k) == String) {
                 k = ObjectId(k);
             }
-            let apt = await apartment.findOne({_id: k});
-            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: k}});
-            await user.findOneAndUpdate({_id: apt.userID}, {$pull: {currentApartments: ObjectId(k)}});
-            await apartment.findOneAndUpdate({_id: k.toString()}, {userID: newUser._id});
+            let apt = await apartment.findOne({ _id: k });
+            await user.findOneAndUpdate({_id: apt.UserID}, { $pull: { CurrentApartments: k}});
+            await user.findOneAndUpdate({_id: apt.UserID}, { $pull: { CurrentApartments: ObjectId(k)}});
+            await apartment.findOneAndUpdate({ _id: k.toString()}, { UserID: newUser._id});
         }
         try {
             await newUser.save();
