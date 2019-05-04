@@ -187,6 +187,7 @@ async function getNearbyApts(req, res, next) {
 
         for (let index = 0; index < apts.length; index++) {
             let thisApt = apts[index]
+            
             let thisLat = thisApt['Lat']
             let thisLong = thisApt['Long']
 
@@ -202,6 +203,7 @@ async function getNearbyApts(req, res, next) {
             }
         }
         res.status(200).json({ "message": 'Got nearby apartments', data: result });
+        return;
     } catch (err) {
         res.status(500).json({ "message" : "Could not get nearby apartments", data: err });
         return;
