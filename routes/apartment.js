@@ -157,6 +157,8 @@ async function removeFromSavedApts(req, res, next) {
     let userID = req.params.userid
     let aptID = req.body.AptID
 
+    console.log("Apt ID: " + aptID);
+
     if (await user.find({ _id: userID }).countDocuments() == 0){
         res.status(400).json({"message" : "Could not remove apartment, user ID not found" });
         return;
@@ -164,6 +166,14 @@ async function removeFromSavedApts(req, res, next) {
     let result = await user.updateOne({ _id: userID}, { $pull: { SavedApartments: aptID }});
     res.status(201).json({ "message": `Apartment ${aptID} removed from User ${userID}\'s SavedApartments`, data: result });
     return;
+}
+
+async function getNearbyApts(req, res, next) {
+    let lat = req.body.Lat
+    let long = req.body.Long 
+    let mileRadius = req.body.miles
+
+    //Math.cos(lat)
 }
 
 
