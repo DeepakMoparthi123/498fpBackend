@@ -158,6 +158,7 @@ async function removeFromSavedApts(req, res, next) {
     let aptID = req.body.AptID
 
     console.log("Apt ID: " + aptID);
+    console.log(req.body);
 
     if (await user.find({ _id: userID }).countDocuments() == 0){
         res.status(400).json({"message" : "Could not remove apartment, user ID not found" });
