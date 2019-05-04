@@ -12,7 +12,7 @@ router.delete('/apartments/:id', apartment.deleteApt);
 
 router.put('/apartments/:userid/current', apartment.addToCurrentApts);
 router.put('/apartments/:userid/saved', apartment.addToSavedApts);
-router.delete('/apartments/:userid/saved', apartment.removeFromSavedApts);
+router.delete('/apartments/:userid/saved/:aptid', apartment.removeFromSavedApts);
 
 router.get('/users', user.getUsers);
 router.post('/users', user.createUser);
