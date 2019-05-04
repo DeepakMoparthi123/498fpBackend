@@ -175,6 +175,9 @@ async function getNearbyApts(req, res, next) {
         let lat = req.body.Lat
         let long = req.body.Long 
         //let mileRadius = req.body.Radius
+        console.log(req.body)
+        console.log(lat)
+        console.log(long)
         let kmRadius = 3.21869;
 
         if (lat == undefined || long == undefined) {
@@ -183,6 +186,7 @@ async function getNearbyApts(req, res, next) {
         }
 
         let apts = await apartment.find()
+        console.log(apts.length)
         let result = []
 
         for (let index = 0; index < apts.length; index++) {
