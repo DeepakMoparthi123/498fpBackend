@@ -13,7 +13,7 @@ router.delete('/apartments/:id', apartment.deleteApt);
 router.put('/apartments/:userid/current', apartment.addToCurrentApts);
 router.put('/apartments/:userid/saved', apartment.addToSavedApts);
 router.delete('/apartments/:userid/saved/:aptid', apartment.removeFromSavedApts);
-router.get('/apartments/nearby/apts', apartment.getNearbyApts);
+router.get('/apartments/nearby/:lat/:long', apartment.getNearbyApts);
 
 router.get('/users', user.getUsers);
 router.post('/users', user.createUser);

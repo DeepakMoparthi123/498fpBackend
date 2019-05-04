@@ -172,8 +172,8 @@ async function removeFromSavedApts(req, res, next) {
 
 async function getNearbyApts(req, res, next) {
     try {
-        let lat = req.body.Lat
-        let long = req.body.Long 
+        let lat = req.params.lat
+        let long = req.params.long 
         //let mileRadius = req.body.Radius
         console.log(req.body)
         console.log(lat)
