@@ -3,7 +3,8 @@ var mongoose = require('mongoose');
 
 // Define our user schema
 var ApartmentSchema = new mongoose.Schema({
-    LatLong: {type:[], required: true},
+    Lat: {type: Number, required: true},
+    Long: {type: Number, required: true},
     Address: {type: String, required: true}, 
     StartDate: {type: Date, required: true},
     EndDate: {type: Date, required: true},

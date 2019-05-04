@@ -46,7 +46,8 @@ async function updateApt(req, res, next){
         await user.updateOne({ _id: (await apartment.findOne({_id: id})).UserID }, { $pull: { CurrentApartments: id }});
         // find and update given apartment (validation run through parameter)
         let k =  apartment.findOneAndUpdate({ "_id": id }, {
-            LatLong: req.body.LatLong,
+            Lat: req.body.Lat,
+            Long: req.body.Long,
             Address: req.body.Address,
             StartDate: req.body.StartDate,
             EndDate: req.body.EndDate,
@@ -98,7 +99,8 @@ async function getApts(req, res, next){
 async function createApt(req, res, next) {
         // Makes new apartment with specifications
     var newApartment = new apartment({
-        LatLong: req.body.LatLong,
+        Lat: req.body.Lat,
+        Long: req.body.Long,
         Address: req.body.Address,
         StartDate: req.body.StartDate,
         EndDate: req.body.EndDate,
@@ -169,11 +171,60 @@ async function removeFromSavedApts(req, res, next) {
 }
 
 async function getNearbyApts(req, res, next) {
-    let lat = req.body.Lat
-    let long = req.body.Long 
-    let mileRadius = req.body.miles
+    try {
+        let lat = req.body.Lat
+        let long = req.body.Long 
+        //let mileRadius = req.body.Radius
+        let kmRadius = 3.21869;
 
-    //Math.cos(lat)
+        if (lat == undefined || long == undefined) {
+            res.status(400).json({"message" : "Latitude, longitude, and radius parameters must be given" });
+            return;
+        }
+
+        let apts = await apartment.find()
+        let result = []
+
+        for (let index = 0; index < apts.length; index++) {
+            let thisApt = apts[index]
+            let thisLat = thisApt['Lat']
+            let thisLong = thisApt['Long']
+
+            console.log(thisLat + " " + thisLong )
+
+            if (thisLat == undefined || thisLong == undefined) {
+                continue;
+            }
+
+            let distance = getDistanceFromLatLonInKm(lat, long, thisLat, thisLong)
+            if (distance < kmRadius) {
+                result.push(thisApt)
+            }
+        }
+        res.status(200).json({ "message": 'Got nearby apartments', data: result });
+    } catch (err) {
+        res.status(500).json({ "message" : "Could not get nearby apartments", data: err });
+        return;
+    }
+    
+}
+
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  var R = 6371; // Radius of the earth in km
+  var dLat = deg2rad(lat2-lat1);  // deg2rad below
+  var dLon = deg2rad(lon2-lon1); 
+  var a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  var d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180)
 }
 
 
@@ -187,5 +238,6 @@ module.exports = {
 	createApt: createApt,
     addToCurrentApts: addToCurrentApts,
     addToSavedApts: addToSavedApts,
-    removeFromSavedApts: removeFromSavedApts
+    removeFromSavedApts: removeFromSavedApts,
+    getNearbyApts: getNearbyApts
 };
